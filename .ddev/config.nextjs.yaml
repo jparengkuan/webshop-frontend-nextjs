@@ -1,0 +1,13 @@
+# Run the Next.js dev server inside the web container and route
+# https://webshop-frontend-nextjs.ddev.site to it.
+webserver_type: generic
+web_extra_daemons:
+  - name: "nextjs"
+    command: "npm install && npm run dev -- --hostname 0.0.0.0 --port 3000"
+    directory: /var/www/html
+web_extra_exposed_ports:
+  - name: nextjs
+    container_port: 3000
+    http_port: 80
+    https_port: 443
+nodejs_version: "22"

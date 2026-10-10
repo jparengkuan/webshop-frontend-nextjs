@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+# A newer push to the same branch or PR makes the running check pointless.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Format, lint, typecheck and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Format
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+  build:
+    name: Build
+    needs: check
+    # The build prerenders the catalog from the API, so it only runs once the repository is
+    # configured with a reachable API (Settings > Secrets and variables > Actions).
+    if: vars.API_URL != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      API_URL: ${{ vars.API_URL }}
+      APP_URL: ${{ vars.APP_URL }}
+      OAUTH_CLIENT_ID: ${{ vars.OAUTH_CLIENT_ID }}
+      OAUTH_CLIENT_SECRET: ${{ secrets.OAUTH_CLIENT_SECRET }}
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('src/**') }}
+          restore-keys: nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+
+      - run: npm run build
